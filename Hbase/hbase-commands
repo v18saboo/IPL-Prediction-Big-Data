@@ -1,0 +1,14 @@
+create 'ipl1','batsman','bowler','zero','one','two','three','four','five','six','wickets','runs','balls'
+
+hbase org.apache.hadoop.hbase.mapreduce.ImportTsv -Dimporttsv.separator=,  -Dimporttsv.columns="HBASE_ROW_KEY,batsman,bowler,zero,one,two,three,four,five,six,wickets,runs,balls" ipl1 hdfs://localhost:9000/user/hadoop/ipldata/out
+
+hbase-daemon.sh start thrift 
+
+import happybase
+conn = happybase.Connection('localhost',port=9000)
+table = conn.table('ipl4')
+
+for key, data in table.scan():
+    print key, data
+
+

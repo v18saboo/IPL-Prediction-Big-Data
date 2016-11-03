@@ -21,7 +21,7 @@ class Match():
 			self.secondInnings=Innings(self.awayBatsmen,self.homeBowlers,awayTeam,homeTeam)
 
 	def createBastman(self,players,batsmanMapping):
-		'''param: players- List of players containing tuples to indicate their name,position''' 
+		'''param: players- List of players containing tuples to indicate their name,position'''
 		batsmen=[]
 		for player in players:
 			if player[0] in batsmanMapping:
@@ -83,6 +83,33 @@ def getClusterVClusterStats(file):
 		clusterStats[line[0]+"-"+line[1]]["Balls"]=line[12]
 	return clusterStats
 
+def getClusterVClusterStatsFromHbase():
+	'''Return : cluster stats is a dictionary with key as batsmanCluster-Blowler cluster
+	Value is a dictionary with meta data like 4s and 6s'''
+
+        import happybase
+        conn = happybase.Connection('localhost')
+        table = conn.table('ipl7')
+        allLines = []
+        for key,data in table.scan():
+                print key, data
+                allLines.append(data)
+
+	clusterStats=dict()
+	for line in allLines:
+		clusterStats[line['batsman:']+"-"+line['bowler:']]=dict()
+		clusterStats[line['batsman:']+"-"+line['bowler:']][0]=line['zero:']
+		clusterStats[line['batsman:']+"-"+line['bowler:']][1]=line['one:']
+		clusterStats[line['batsman:']+"-"+line['bowler:']][2]=line['two:']
+		clusterStats[line['batsman:']+"-"+line['bowler:']][3]=line['three:']
+		clusterStats[line['batsman:']+"-"+line['bowler:']][4]=line['four:']
+		clusterStats[line['batsman:']+"-"+line['bowler:']][5]=line['five:']
+		clusterStats[line['batsman:']+"-"+line['bowler:']][6]=line['six:']
+		clusterStats[line['batsman:']+"-"+line['bowler:']][7]=0
+		clusterStats[line['batsman:']+"-"+line['bowler:']]["Wickets"]=line['wickets:']
+		clusterStats[line['batsman:']+"-"+line['bowler:']]["Runs"]=line['runs:']
+		clusterStats[line['batsman:']+"-"+line['bowler:']]["Balls"]=line['balls:']
+	return clusterStats
 
 
 if __name__=="__main__":
@@ -94,10 +121,12 @@ if __name__=="__main__":
 	bowlerMapping=mapPlayerToCluster(allLines)
 	#print batsmanMapping
 	homeTeam=[('CH Gayle',1),('V Kohli',2),('AB de Villiers',3),('KL Rahul',4),('SR Watson',5),('Sachin Baby',6),('STR Binny',7),('MA Starc',8),('Iqbal Abdulla',9),('S Aravind',10),('YS Chahal',11)]
-	awayTeam=[('DA Warner',1),('S Dhawan',2),('MC Henriques',3),('Yuvraj Singh',4),('DJ Hooda',5),('BCJ Cutting',6),('NV Ojha',7),('Bipul Sharma',8),('B Kumar',9),('BB Sran',10),('DW Steyn',11)]	
+	awayTeam=[('DA Warner',1),('S Dhawan',2),('MC Henriques',3),('Yuvraj Singh',4),('DJ Hooda',5),('BCJ Cutting',6),('NV Ojha',7),('Bipul Sharma',8),('B Kumar',9),('BB Sran',10),('DW Steyn',11)]
 	final=Match("RCB","SRH",homeTeam,awayTeam,batsmanMapping,bowlerMapping)
 	#print final.homeBatsmen
 	#print final.homeBowlers
 	clusterStats=getClusterVClusterStats("Dataset/clusterVcluster.csv")
 	#print clusterStats
 	final.simulate(clusterStats)
+        clusterStatsFromHbase=getClusterVClusterStatsFromHbase()
+        final.simulate(clusterStatsFromHbase)
