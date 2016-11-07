@@ -1,5 +1,6 @@
 from bowler import Bowler
 from batsman import Batsman
+import random
 class Innings:
 	def __init__(self,batsmen,bowlers,battingTeam,bowlingTeam):
 		self.batsmen=batsmen
@@ -15,27 +16,6 @@ class Innings:
 		self.onStrike,self.nonStrike=self.nonStrike,self.onStrike
 		self.onStrikeProbs,self.nonStrikeProbs=self.nonStrikeProbs,self.onStrikeProbs
 
-	def setProbs(self,metadata):
-		events=[i for i in range(0,8)]
-		#events.append("Wickets")
-		probs=dict()
-		l=[metadata[i] for i in range(0,8)]
-		l.append(metadata["Wickets"])
-		total=sum(map(lambda x:float(x),l))
-		for event in events:
-			probs[event]=float(metadata[event])/float(total)
-			probs["Init"+str(event)]=probs[event]
-		probs["Wickets"]=float(metadata["Wickets"])/float(total)
-		probs["NotOut"]=1-float(probs["Wickets"])
-		probs["InitNotOut"] = probs["NotOut"]
-		return probs
-
-	def calculateProbs(self):
-		self.onStrikeProbs={self.onStrike.clusterNumber+"-"+str(i):self.setProbs(self.clusterStats[self.onStrike.clusterNumber+"-"+str(i)]) for i in range(0,10)}
-		'''{"0-1":{1:,2:,3:},"0-0":{},}'''
-		self.nonStrikeProbs={self.nonStrike.clusterNumber+"-"+str(i):self.setProbs(self.clusterStats[self.nonStrike.clusterNumber+"-"+str(i)])for i in range(0,10)}
-		
-		#print self.nonStrikeProbs.keys()
 	def initScoreBoardForBatsman(self,batsman):
 		#print batsman
 		self.battingScoreCard[batsman]=dict()
@@ -64,25 +44,53 @@ class Innings:
 
 	def updateOverForBowler(self,bowlerData):
 		bowlerData["overs"]+=1
-		
+
+	def setProbs(self,metadata):
+		events=[i for i in range(0,8)]
+		events.append("Wickets")
+		probs=dict()
+		l=[metadata[i] for i in range(0,8)]
+		l.append(metadata["Wickets"])
+		total=sum(map(lambda x:float(x),l))
+		for event in events:
+			probs[event]=float(metadata[event])/float(total)
+		running=0
+		l.pop(-1)
+		runsTotal=sum(map(lambda x:float(x),l))
+		for i in range(8):
+			probs[i]=float(metadata[i])/float(runsTotal)
+		for event in events:
+			if event!="Wickets":
+				probs[event]=running+probs[event]
+				running=probs[event]
+
+		probs["Wickets"]=float(metadata["Wickets"])/float(total)
+		probs["NotOut"]=1-float(probs["Wickets"])
+		probs["InitNotOut"] = probs["NotOut"]
+		#print max(map(lambda x:probs[x],range(8)))
+		#exit(0)
+		return probs
+
+	def calculateProbs(self):
+		self.onStrikeProbs={self.onStrike.clusterNumber+"-"+str(i):self.setProbs(self.clusterStats[self.onStrike.clusterNumber+"-"+str(i)]) for i in range(0,10)}
+		'''{"0-1":{1:,2:,3:},"0-0":{},}'''
+		self.nonStrikeProbs={self.nonStrike.clusterNumber+"-"+str(i):self.setProbs(self.clusterStats[self.nonStrike.clusterNumber+"-"+str(i)])for i in range(0,10)}
+		#print self.nonStrikeProbs.keys()
 	
 	def getNewBatsman(self):
-		self.onStrike=self.batsmen[self.wickets+1]
-		self.initScoreBoardForBatsman(self.batsmen[self.wickets+1])		
+		self.onStrike=self.batsmen[self.wickets+1]		
 		self.onStrikeProbs={self.onStrike.clusterNumber+"-"+str(i):self.setProbs(self.clusterStats[self.onStrike.clusterNumber+"-"+str(i)]) for i in range(0,10)}
 
 	def getMaxKey(self,d):
 		maxVal=0
 		maxKey=0
-		initList=['Init'+str(event) for event in range(0,8)]
-		initList.append("InitNotOut")
-		initList.append('NotOut')
-		initList.append('Wickets')
+		r=random.random()
 		for key in d:	
-			if key not in initList:
-				if maxVal<d[key]:
-					maxVal=d[key]
+			if key not in ['NotOut','Wickets','InitNotOut']:
+				if r<d[key]:
 					maxKey=key
+					break
+		#print r,maxKey			
 		return int(maxKey)
 
 	def simulateOver(self,currentBowler):
@@ -94,12 +102,12 @@ class Innings:
 			maxProb=self.getMaxKey(onStrikeProbs)
 			print "On strike",self.onStrike
 			runsScored=maxProb
+			self.updateBattingScore(self.battingScoreCard[self.onStrike],runsScored,1)
+			self.updateBowlingScore(self.bowlingScoreCard[currentBowler],runsScored)
 			#print "Not out probability = ",onStrikeProbs["NotOut"]
 			if onStrikeProbs["NotOut"]>0.5:
-				onStrikeProbs[runsScored]=onStrikeProbs[runsScored]*onStrikeProbs["Init"+str(runsScored)]
+				onStrikeProbs[runsScored]=onStrikeProbs[runsScored]*onStrikeProbs[runsScored]
 				self.score+=runsScored
-				self.updateBattingScore(self.battingScoreCard[self.onStrike],runsScored,1)
-				self.updateBowlingScore(self.bowlingScoreCard[currentBowler],runsScored)
 				if self.score>self.target and self.target!=-1:
 					return True
 				onStrikeProbs["NotOut"]=onStrikeProbs["NotOut"]*onStrikeProbs["InitNotOut"]
@@ -124,9 +132,9 @@ class Innings:
 			count+=1
 		
 		self.updateOverForBowler(self.bowlingScoreCard[currentBowler])
-		#print self.battingScoreCard
-		print self.bowlingScoreCard
 		self.swapBatsman()	
+		print self.battingScoreCard
+		print self.bowlingScoreCard
 		print self.score,self.wickets
 		return False
 		#print "***********"
@@ -142,7 +150,7 @@ class Innings:
 		self.initScoreBoardForBatsman(self.batsmen[1])
 		currentBowler=self.bowlers[-1]
 		self.target=target
-		print self.bowlers
+		#print self.bowlers
 		self.calculateProbs()
 		#print self.onStrikeProbs
 		'''
@@ -163,8 +171,8 @@ class Innings:
 		fullWickets=0
 		for i in range(20):
 			print self.bowlers
-			#index = int(raw_input("Enter bowler index"))
-			index=-1
+			index = int(raw_input("Enter bowler index"))
+			#index=5
 			print "Bowler = ",self.bowlers[index]
 			if self.simulateOver(self.bowlers[index]):
 				break
